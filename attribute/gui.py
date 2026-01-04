@@ -44,6 +44,9 @@ class MetadataGUI:
         self.current_file: Optional[Path] = None
         self.selected_files: Set[Path] = set()
         self.image_files: List[Path] = []
+        self.save_timer: Optional[str] = None
+        self.is_saving: bool = False
+        self.has_unsaved_changes: bool = False
 
         self.setup_ui()
         self.load_directory()
@@ -161,18 +164,26 @@ class MetadataGUI:
         # Configure grid weights
         form_frame.columnconfigure(1, weight=1)
 
-        # Buttons
+        # Buttons (only Clear, no Save button)
         button_frame = ttk.Frame(right_frame)
         button_frame.pack(pady=10)
-
-        self.save_btn = ttk.Button(
-            button_frame, text="Save", command=self.save_metadata
-        )
-        self.save_btn.pack(side=tk.LEFT, padx=5)
 
         ttk.Button(button_frame, text="Clear", command=self.clear_form).pack(
             side=tk.LEFT, padx=5
         )
+
+        # Status bar at bottom
+        self.status_bar = ttk.Label(
+            self.root,
+            text="Ready",
+            relief=tk.SUNKEN,
+            anchor=tk.W,
+            padding=5,
+        )
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Bind input events for auto-save
+        self.setup_auto_save()
 
     def load_directory(self) -> None:
         """Load image files from directory."""
@@ -206,6 +217,50 @@ class MetadataGUI:
             selected_index = selection[0]
             self.select_file(self.image_files[selected_index])
 
+    def setup_auto_save(self) -> None:
+        """Set up auto-save event bindings."""
+        # Bind to Text widgets (prompt, description)
+        self.prompt_text.bind("<KeyRelease>", self.on_input_change)
+        self.prompt_text.bind("<FocusOut>", self.on_field_focus_out)
+        self.description_text.bind("<KeyRelease>", self.on_input_change)
+        self.description_text.bind("<FocusOut>", self.on_field_focus_out)
+
+        # Bind to Entry widgets (model, date, tags, copyright, artist)
+        self.model_entry.bind("<KeyRelease>", self.on_input_change)
+        self.model_entry.bind("<FocusOut>", self.on_field_focus_out)
+        self.date_entry.bind("<KeyRelease>", self.on_input_change)
+        self.date_entry.bind("<FocusOut>", self.on_field_focus_out)
+        self.tags_entry.bind("<KeyRelease>", self.on_input_change)
+        self.tags_entry.bind("<FocusOut>", self.on_field_focus_out)
+        self.copyright_entry.bind("<KeyRelease>", self.on_input_change)
+        self.copyright_entry.bind("<FocusOut>", self.on_field_focus_out)
+        self.artist_entry.bind("<KeyRelease>", self.on_input_change)
+        self.artist_entry.bind("<FocusOut>", self.on_field_focus_out)
+
+    def on_input_change(self, event: tk.Event) -> None:
+        """Handle input change - schedule auto-save after 5 seconds."""
+        self.has_unsaved_changes = True
+        self.update_status("Unsaved changes...")
+
+        # Cancel existing timer
+        if self.save_timer:
+            self.root.after_cancel(self.save_timer)
+
+        # Schedule new save after 5 seconds
+        self.save_timer = self.root.after(5000, self.auto_save)
+
+    def on_field_focus_out(self, event: tk.Event) -> None:
+        """Handle field focus loss - save immediately."""
+        if self.has_unsaved_changes and self.current_file:
+            self.auto_save()
+
+    def auto_save(self) -> None:
+        """Auto-save metadata if there are unsaved changes."""
+        if not self.has_unsaved_changes or not self.current_file or self.is_saving:
+            return
+
+        self.save_metadata(silent=True)
+
     def select_file(self, file_path: Path) -> None:
         """Select and load a file.
 
@@ -214,9 +269,15 @@ class MetadataGUI:
         file_path : Path
             Path to image file.
         """
+        # Save current file before switching
+        if self.current_file and self.has_unsaved_changes:
+            self.auto_save()
+
         self.current_file = file_path
+        self.has_unsaved_changes = False
         self.load_preview(file_path)
         self.load_metadata(file_path)
+        self.update_status(f"Loaded: {file_path.name}")
 
     def load_preview(self, file_path: Path) -> None:
         """Load image preview.
@@ -247,6 +308,11 @@ class MetadataGUI:
         file_path : Path
             Path to image file.
         """
+        # Cancel any pending save timer
+        if self.save_timer:
+            self.root.after_cancel(self.save_timer)
+            self.save_timer = None
+
         try:
             metadata = read_metadata(file_path)
 
@@ -270,6 +336,8 @@ class MetadataGUI:
 
             self.artist_entry.delete(0, tk.END)
             self.artist_entry.insert(0, metadata.artist or "")
+
+            self.has_unsaved_changes = False
 
         except MetadataError as e:
             messagebox.showerror("Error", f"Failed to load metadata: {e}")
@@ -300,18 +368,48 @@ class MetadataGUI:
             custom_fields={},
         )
 
-    def save_metadata(self) -> None:
-        """Save metadata to current file."""
+    def save_metadata(self, silent: bool = False) -> None:
+        """Save metadata to current file.
+
+        Parameters
+        ----------
+        silent : bool
+            If True, don't show messagebox, only update status bar.
+        """
         if not self.current_file:
-            messagebox.showwarning("Warning", "No file selected")
+            if not silent:
+                messagebox.showwarning("Warning", "No file selected")
             return
+
+        if self.is_saving:
+            return
+
+        self.is_saving = True
+        self.update_status("Saving...")
 
         try:
             metadata = self.get_form_metadata()
             write_metadata(self.current_file, metadata)
-            messagebox.showinfo("Success", "Metadata saved successfully!")
+            self.has_unsaved_changes = False
+            self.update_status(f"Saved: {self.current_file.name}")
+            if not silent:
+                messagebox.showinfo("Success", "Metadata saved successfully!")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save metadata: {e}")
+            self.update_status(f"Error: {str(e)}")
+            if not silent:
+                messagebox.showerror("Error", f"Failed to save metadata: {e}")
+        finally:
+            self.is_saving = False
+
+    def update_status(self, message: str) -> None:
+        """Update status bar message.
+
+        Parameters
+        ----------
+        message : str
+            Status message to display.
+        """
+        self.status_bar.config(text=message)
 
     def batch_apply_metadata(self) -> None:
         """Apply metadata to selected files."""
