@@ -20,11 +20,75 @@ from attribute.gui import edit_metadata_gui
 from attribute.export import export_metadata, import_metadata
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(version="0.1.0")
-def main() -> None:
+@click.argument("image_path", required=False, type=click.Path(path_type=Path))
+@click.option(
+    "--tui",
+    is_flag=True,
+    help="Launch TUI interface instead of editor",
+)
+@click.option(
+    "--gui",
+    is_flag=True,
+    help="Launch GUI interface (for directories)",
+)
+@click.pass_context
+def main(
+    ctx: click.Context,
+    image_path: Optional[Path],
+    tui: bool,
+    gui: bool,
+) -> None:
     """Add metadata to AI-generated images."""
-    pass
+    # If a subcommand was invoked, don't handle here
+    if ctx.invoked_subcommand is not None:
+        return
+    
+    # If no image path provided, show help
+    if image_path is None:
+        click.echo(ctx.get_help())
+        ctx.exit()
+    
+    # Validate path exists
+    if not image_path.exists():
+        click.echo(f"Error: {image_path} does not exist", err=True)
+        sys.exit(1)
+    
+    # Route to appropriate handler
+    if gui:
+        # GUI mode - can handle directories
+        if image_path.is_dir():
+            edit_metadata_gui(image_path)
+        elif image_path.is_file():
+            edit_metadata_gui(image_path.parent, initial_file=image_path)
+        else:
+            click.echo(f"Error: {image_path} is not a file or directory", err=True)
+            sys.exit(1)
+    elif tui:
+        # TUI mode
+        if not image_path.is_file():
+            click.echo(f"Error: {image_path} is not a file", err=True)
+            sys.exit(1)
+        if not is_supported_format(image_path):
+            click.echo(
+                f"Error: Unsupported format: {image_path.suffix}",
+                err=True,
+            )
+            sys.exit(1)
+        edit_metadata_tui(image_path)
+    else:
+        # Default editor mode
+        if not image_path.is_file():
+            click.echo(f"Error: {image_path} is not a file", err=True)
+            sys.exit(1)
+        if not is_supported_format(image_path):
+            click.echo(
+                f"Error: Unsupported format: {image_path.suffix}",
+                err=True,
+            )
+            sys.exit(1)
+        edit_metadata_editor(image_path)
 
 
 @main.command()
