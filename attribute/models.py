@@ -110,17 +110,12 @@ class ImageMetadata:
         else:
             custom_fields = {}
         
-        # Extract other custom fields (keys starting with custom_ or not in standard_fields)
+        # Extract other custom fields (keys not in standard_fields)
+        # Note: We preserve keys as-is here. The "custom_" prefix stripping
+        # only happens when reading from PNG text chunks in metadata.py
         for k, v in data.items():
             if k not in standard_fields:
-                if k.startswith("custom_"):
-                    # Extract key after "custom_" prefix
-                    extracted_key = k[7:]
-                    if extracted_key != "custom_fields":  # Avoid nesting
-                        custom_fields[extracted_key] = str(v)
-                else:
-                    # Other non-standard fields
-                    custom_fields[k] = str(v)
+                custom_fields[k] = str(v)
 
         return cls(
             prompt=data.get("prompt", ""),
