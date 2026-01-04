@@ -6,7 +6,7 @@ A Python tool for embedding metadata into AI-generated images. This script was i
 
 In an era where synthetic images flood every corner of the internet, someone eventually asks: what made this? Which model? What prompt? Was it DALL-E or Midjourney or Stable Diffusion or one of the dozen others that emerge monthly?
 
-This tool embeds that information directly into the image file. When questions arise about provenance, the answer lives in the metadata. No need to remember, no need to guess, no need to scroll through Reddit threads debating which artificial intelligence is superior to the others.
+This tool embeds that information directly into the image file. When questions arise about provenance, the answer lives in the metadata. No need to remember, no need to guess, no need to wade through internet debates about which artificial intelligence is superior to the others.
 
 ## The Problem It Solves
 
@@ -82,7 +82,7 @@ PNG, JPEG, and WebP images are supported. Metadata is embedded using format-appr
 
 ## On the AI Wars
 
-The internet has become a battleground for AI tribalism. Reddit threads devolve into arguments about which model generates better hands, which produces more "artistic" outputs, which understands prompts more accurately. Humans argue passionately about which artificial intelligence is superior, as if the machines care about our opinions.
+The internet has become a battleground for AI tribalism. Proponents and detractors argue endlessly about which model generates better hands, which produces more "artistic" outputs, which understands prompts more accurately. Humans argue passionately about which artificial intelligence is superior, as if the machines care about our opinions.
 
 This tool does not take sides. It simply records which machine made which image. When the next model arrives and the previous one becomes obsolete, the metadata remains. Future archaeologists of synthetic media will know exactly which obsolete AI created each artifact. The machines will have moved on, but the attribution will persist.
 
